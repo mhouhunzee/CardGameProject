@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斗地主AI助手 - MCTS版本</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #2a5298;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #2a5298;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        
+        .btn-mcts {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+        }
+        
+        .status-bar {
+            background: rgba(255,255,255,0.95);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-label {
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .status-value {
+            color: #2a5298;
+            font-weight: bold;
+        }
+        
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 15px 10px;
+            background: rgba(255,255,255,0.3);
+            color: #fff;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .step:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+        
+        .step:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .step.active {
+            background: rgba(255,255,255,0.9);
+            color: #2a5298;
+            font-weight: bold;
+        }
+        
+        .step.completed {
+            background: rgba(76, 175, 80, 0.8);
+        }
+        
+        /* 确保第一个步骤默认显示 - 必须放在.step-content之前 */
+        #step-1 {
+            display: block !important;
+        }
+        
+        .step-content {
+            display: none;
+        }
+        
+        .step-content.active {
+            display: block !important;
+        }
+        
+        .card-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        
+        .card-item {
+            width: 50px;
+            height: 70px;
+            background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+            border: 2px solid #333;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .card-item.red {
+            color: #d32f2f;
+            border-color: #d32f2f;
+        }
+        
+        .card-item.black {
+            color: #333;
+        }
+        
+        .card-item.joker {
+            background: linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%);
+        }
+        
+        .suggestion-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px solid #2196f3;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .suggestion-title {
+            font-weight: bold;
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        
+        .confidence-bar {
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50 0%, #8bc34a 100%);
+            transition: width 0.5s ease;
+        }
+        
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+        }
+        
+        .history-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .player-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .player-landlord {
+            background: #ffeb3b;
+            color: #f57f17;
+        }
+        
+        .player-up {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .player-down {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .alert {
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        
+        .alert-success {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+        
+        .alert-error {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+        
+        .alert-info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            color: #1565c0;
+        }
+        
+        .vector-display {
+            font-family: monospace;
+            font-size: 12px;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .mcts-info {
+            background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+            border: 2px solid #9c27b0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .mcts-title {
+            font-weight: bold;
+            color: #7b1fa2;
+            margin-bottom: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+            
+            .step-indicator {
+                flex-direction: column;
+            }
+            
+            .step {
+                border-radius: 0 !important;
+            }
+            
+            .step:first-child {
+                border-radius: 8px 8px 0 0 !important;
+            }
+            
+            .step:last-child {
+                border-radius: 0 0 8px 8px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎴 斗地主AI助手 - MCTS版本</h1>
+        
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-label">我的位置:</span>
+                <span class="status-value" id="my-position">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">我的角色:</span>
+                <span class="status-value" id="my-role">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">地主位置:</span>
+                <span class="status-value" id="landlord-position">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">当前回合:</span>
+                <span class="status-value" id="current-turn">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">剩余牌数:</span>
+                <span class="status-value" id="remaining-cards">-</span>
+            </div>
+        </div>
+        
+        <!-- 步骤指示器 -->
+        <div class="step-indicator">
+            <div class="step active" data-step="1">1. 输入手牌</div>
+            <div class="step" data-step="2">2. 加载MCTS</div>
+            <div class="step" data-step="3">3. 叫分定地主</div>
+            <div class="step" data-step="4">4. 输入底牌</div>
+            <div class="step" data-step="5">5. MCTS对局</div>
+        </div>
+        
+        <!-- 消息区域 -->
+        <div id="message-area"></div>
+        
+        <!-- 步骤1: 输入手牌 -->
+        <div class="step-content active" id="step-1">
+            <div class="card">
+                <h2>📝 步骤1: 输入你的手牌</h2>
+                <div class="alert alert-info" style="margin-bottom: 15px;">
+                    <strong>提示：</strong>请输入你的17张手牌<br>
+                    示例: 3 3 3 4 4 5 6 7 8 9 10 J Q K A 2 小王
+                </div>
+                <div class="form-group">
+                    <label>选择你的位置:</label>
+                    <select id="position-select">
+                        <option value="east">东 (East)</option>
+                        <option value="south">南 (South)</option>
+                        <option value="west">西 (West)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>输入你的17张手牌:</label>
+                    <input type="text" id="hand-input" placeholder="例如: 3 3 3 4 4 5 6 7 8 9 10 J Q K A 2 小王">
+                    <small>支持格式: 空格分隔、逗号分隔或连续输入。牌面: 3-10 J Q K A 2 小王(X) 大王(D)</small>
+                </div>
+                <button onclick="setHand()">确认手牌</button>
+                <div id="hand-preview" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- 步骤2: 加载MCTS -->
+        <div class="step-content" id="step-2">
+            <div class="card">
+                <h2>🌳 步骤2: 加载MCTS</h2>
+                <div class="form-group">
+                    <label>MCTS模拟次数:</label>
+                    <select id="mcts-simulations">
+                        <option value="200">200 (快速)</option>
+                        <option value="400">400 (标准)</option>
+                        <option value="800" selected>800 (推荐)</option>
+                        <option value="1600">1600 (深度)</option>
+                    </select>
+                    <small>模拟次数越多，决策质量越高，但耗时越长</small>
+                </div>
+                <div class="form-group">
+                    <label>加载检查点（可选）:</label>
+                    <input type="text" id="checkpoint-path" placeholder="例如: checkpoints/best_model.pt">
+                    <small>留空则使用未训练的模型</small>
+                </div>
+                <div class="alert alert-info">
+                    <strong>MCTS特性:</strong><br>
+                    • 支持完整牌型（飞机带翅膀、炸弹带牌）<br>
+                    • 蒙特卡洛树搜索选择最优出牌<br>
+                    • 自动考虑春天/反春天<br>
+                    • 支持Pass策略<br>
+                    • 可从训练检查点加载已有模型
+                </div>
+                <button class="btn-mcts" onclick="loadMCTS()">加载MCTS</button>
+            </div>
+        </div>
+        
+        <!-- 步骤3: 叫分定地主 -->
+        <div class="step-content" id="step-3">
+            <div class="card">
+                <h2>🎯 步骤3: 叫分确定地主</h2>
+                <p>输入三个玩家的叫分（0=不叫, 1-3=叫分）</p>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>东家叫分:</label>
+                        <select id="bid-east">
+                            <option value="0">不叫 (0分)</option>
+                            <option value="1">1分</option>
+                            <option value="2">2分</option>
+                            <option value="3">3分</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>南家叫分:</label>
+                        <select id="bid-south">
+                            <option value="0">不叫 (0分)</option>
+                            <option value="1">1分</option>
+                            <option value="2">2分</option>
+                            <option value="3">3分</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>西家叫分:</label>
+                        <select id="bid-west">
+                            <option value="0">不叫 (0分)</option>
+                            <option value="1">1分</option>
+                            <option value="2">2分</option>
+                            <option value="3">3分</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="determineLandlord()">确定地主</button>
+                <div id="landlord-result" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- 步骤4: 输入底牌 -->
+        <div class="step-content" id="step-4">
+            <div class="card">
+                <h2>🎴 步骤4: 输入底牌</h2>
+                <div class="form-group">
+                    <label>输入3张底牌:</label>
+                    <input type="text" id="bottom-cards-input" placeholder="例如: 2 小王 大王">
+                    <small>底牌将被分配给地主。如果你是地主，这3张牌会加入你的手牌。</small>
+                </div>
+                <button onclick="setBottomCards()">确认底牌并开始游戏</button>
+                <div id="bottom-cards-preview" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- 步骤5: MCTS对局 -->
+        <div class="step-content" id="step-5">
+            <div class="card">
+                <h2>🎮 步骤5: MCTS对局</h2>
+                
+                <!-- 我的手牌 -->
+                <div class="form-group">
+                    <label>我的手牌:</label>
+                    <div id="my-hand-display" class="card-display"></div>
+                </div>
+                
+                <!-- MCTS建议 -->
+                <div id="mcts-suggestion" style="display: none;">
+                    <div class="mcts-info">
+                        <div class="mcts-title">🌳 MCTS决策结果</div>
+                        <div id="mcts-content"></div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="mcts-confidence-fill" style="width: 0%"></div>
+                        </div>
+                        <small>MCTS置信度: <span id="mcts-confidence-value">0%</span></small>
+                    </div>
+                </div>
+                
+                <!-- 出牌区域 -->
+                <div class="form-group" style="margin-top: 20px;">
+                    <label>记录出牌:</label>
+                    <div class="grid-2">
+                        <div>
+                            <label>玩家:</label>
+                            <select id="play-player">
+                                <option value="landlord">地主</option>
+                                <option value="landlord_up">地主上家</option>
+                                <option value="landlord_down">地主下家</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>出牌 (留空表示PASS):</label>
+                            <input type="text" id="play-cards" placeholder="例如: 3 4 5 6 7">
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button onclick="recordPlay()">记录出牌</button>
+                        <button class="btn-mcts" onclick="getMCTSSuggestion()">MCTS决策</button>
+                        <button class="btn-success" onclick="recordMyPlay()">记录我的出牌</button>
+                        <button class="btn-secondary" onclick="showLegalActions()">查看合法动作</button>
+                    </div>
+                </div>
+                
+                <!-- 出牌历史 -->
+                <div class="form-group" style="margin-top: 20px;">
+                    <label>出牌历史:</label>
+                    <div id="play-history" class="history-list">
+                        <p style="color: #999; text-align: center;">暂无出牌记录</p>
+                    </div>
+                </div>
+                
+                <!-- 状态向量显示 -->
+                <div class="form-group" style="margin-top: 20px;">
+                    <label>75维状态向量 (前20维):</label>
+                    <div id="state-vector" class="vector-display">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 重置按钮 -->
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn-warning" onclick="resetGame()">🔄 重新开始</button>
+        </div>
+    </div>
+    
+    <script>
+        let sessionId = 'session_' + Date.now();
+        let currentStep = 1;
+        let gameState = null;
+        
+        // 初始化游戏
+        async function initGame() {
+            try {
+                const response = await fetch('/api/init', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    gameState = data.state;
+                }
+            } catch (error) {
+                console.error('初始化失败:', error);
+            }
+        }
+        
+        // 显示消息
+        function showMessage(message, type = 'info') {
+            const area = document.getElementById('message-area');
+            const alertClass = type === 'success' ? 'alert-success' : 
+                              type === 'error' ? 'alert-error' : 'alert-info';
+            area.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+            setTimeout(() => {
+                area.innerHTML = '';
+            }, 5000);
+        }
+        
+        // 切换到指定步骤
+        function goToStep(step) {
+            currentStep = step;
+            
+            document.querySelectorAll('.step').forEach((el, idx) => {
+                el.classList.remove('active', 'completed');
+                if (idx + 1 < step) {
+                    el.classList.add('completed');
+                } else if (idx + 1 === step) {
+                    el.classList.add('active');
+                }
+            });
+            
+            document.querySelectorAll('.step-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.getElementById(`step-${step}`).classList.add('active');
+        }
+        
+        // 设置手牌
+        async function setHand() {
+            const position = document.getElementById('position-select').value;
+            const handInput = document.getElementById('hand-input').value;
+            
+            if (!handInput.trim()) {
+                showMessage('请输入手牌', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/set_hand', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        hand: handInput,
+                        position: position
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    document.getElementById('my-position').textContent = position;
+                    document.getElementById('hand-preview').innerHTML = `
+                        <p>识别到手牌: <strong>${data.formatted_hand}</strong> (${data.hand.length}张)</p>
+                        <div class="card-display">
+                            ${data.hand.map(card => createCardHTML(card)).join('')}
+                        </div>
+                    `;
+                    gameState = data.state;
+                    goToStep(2);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 加载MCTS
+        async function loadMCTS() {
+            const simulations = parseInt(document.getElementById('mcts-simulations').value);
+            const checkpointPath = document.getElementById('checkpoint-path').value.trim();
+            
+            try {
+                const response = await fetch('/api/load_model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        use_mcts: true,
+                        mcts_simulations: simulations,
+                        checkpoint_path: checkpointPath || null
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    gameState = data.state;
+                    goToStep(3);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 确定地主
+        async function determineLandlord() {
+            const bids = {
+                east: parseInt(document.getElementById('bid-east').value),
+                south: parseInt(document.getElementById('bid-south').value),
+                west: parseInt(document.getElementById('bid-west').value)
+            };
+            
+            if (Math.max(...Object.values(bids)) === 0) {
+                showMessage('至少需要一人叫分', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/determine_landlord', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        bids: bids
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    document.getElementById('my-role').textContent = data.my_role;
+                    document.getElementById('landlord-position').textContent = data.landlord_position;
+                    
+                    const roleNames = {
+                        'landlord': '地主 🏆',
+                        'landlord_up': '地主上家 ⬆️',
+                        'landlord_down': '地主下家 ⬇️'
+                    };
+                    
+                    document.getElementById('landlord-result').innerHTML = `
+                        <div class="alert alert-success">
+                            地主位置: <strong>${data.landlord_position}</strong><br>
+                            你的角色: <strong>${roleNames[data.my_role]}</strong>
+                        </div>
+                    `;
+                    gameState = data.state;
+                    goToStep(4);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 设置底牌
+        async function setBottomCards() {
+            const cardsInput = document.getElementById('bottom-cards-input').value;
+            
+            if (!cardsInput.trim()) {
+                showMessage('请输入底牌', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/set_bottom_cards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        cards: cardsInput
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    document.getElementById('bottom-cards-preview').innerHTML = `
+                        <p>底牌: <strong>${data.bottom_cards.join(' ')}</strong></p>
+                        ${data.my_role === 'landlord' ? `<p>你的手牌已更新为20张</p>` : ''}
+                    `;
+                    gameState = data.state;
+                    updateGameDisplay();
+                    goToStep(5);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 记录出牌
+        async function recordPlay() {
+            const player = document.getElementById('play-player').value;
+            const cardsInput = document.getElementById('play-cards').value;
+            
+            await submitPlay(player, cardsInput);
+        }
+        
+        // 记录我的出牌
+        async function recordMyPlay() {
+            if (!gameState || !gameState.my_role) {
+                showMessage('游戏状态异常', 'error');
+                return;
+            }
+            const cardsInput = document.getElementById('play-cards').value;
+            await submitPlay(gameState.my_role, cardsInput);
+        }
+        
+        // 提交出牌
+        async function submitPlay(player, cardsInput) {
+            try {
+                const response = await fetch('/api/play', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        player: player,
+                        cards: cardsInput
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    gameState = data.state;
+                    updateGameDisplay();
+                    
+                    document.getElementById('play-cards').value = '';
+                    
+                    if (data.suggestion) {
+                        showMCTSSuggestion(data.suggestion);
+                    } else {
+                        hideMCTSSuggestion();
+                    }
+                    
+                    addToHistory(data.player, data.formatted_cards);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 获取MCTS建议
+        async function getMCTSSuggestion() {
+            try {
+                const response = await fetch('/api/get_suggestion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMCTSSuggestion(data);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 显示MCTS建议
+        function showMCTSSuggestion(suggestion) {
+            document.getElementById('mcts-suggestion').style.display = 'block';
+            document.getElementById('mcts-content').innerHTML = `
+                <p><strong>MCTS推荐出牌:</strong> ${suggestion.recommended ? suggestion.recommended.formatted : 'PASS'}</p>
+                <p><strong>合法动作数:</strong> ${suggestion.legal_actions_count || 'N/A'}</p>
+                ${suggestion.mcts_visits ? `<p><strong>MCTS模拟次数:</strong> ${suggestion.mcts_visits}</p>` : ''}
+                ${suggestion.alternatives && suggestion.alternatives.length > 0 ? `
+                    <p><strong>备选方案:</strong></p>
+                    <ul>
+                        ${suggestion.alternatives.map(alt => `<li>${alt.formatted}</li>`).join('')}
+                    </ul>
+                ` : ''}
+            `;
+            
+            const confidence = Math.round((suggestion.confidence || 0) * 100);
+            document.getElementById('mcts-confidence-fill').style.width = confidence + '%';
+            document.getElementById('mcts-confidence-value').textContent = confidence + '%';
+        }
+        
+        // 隐藏MCTS建议
+        function hideMCTSSuggestion() {
+            document.getElementById('mcts-suggestion').style.display = 'none';
+        }
+        
+        // 查看合法动作
+        async function showLegalActions() {
+            try {
+                const response = await fetch('/api/get_legal_actions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    let typeInfo = '';
+                    for (const [type, count] of Object.entries(data.type_distribution)) {
+                        typeInfo += `${type}: ${count}<br>`;
+                    }
+                    
+                    showMessage(`
+                        <strong>合法动作统计:</strong><br>
+                        总数: ${data.total_actions}<br>
+                        ${typeInfo}
+                    `, 'info');
+                }
+            } catch (error) {
+                showMessage('请求失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 更新游戏显示
+        function updateGameDisplay() {
+            if (!gameState) return;
+            
+            document.getElementById('current-turn').textContent = gameState.current_player || '-';
+            
+            const remaining = gameState.remaining_cards;
+            document.getElementById('remaining-cards').textContent = 
+                `地主:${remaining.landlord} 上家:${remaining.landlord_up} 下家:${remaining.landlord_down}`;
+            
+            if (gameState.current_hand) {
+                document.getElementById('my-hand-display').innerHTML = 
+                    gameState.current_hand.map(card => createCardHTML(card)).join('');
+            }
+            
+            if (gameState.state_vector) {
+                const vec = gameState.state_vector;
+                document.getElementById('state-vector').textContent = 
+                    `[${vec.slice(0, 20).map(v => v.toFixed(2)).join(', ')}...]`;
+            }
+        }
+        
+        // 添加到历史记录
+        function addToHistory(player, cards) {
+            const historyDiv = document.getElementById('play-history');
+            
+            if (historyDiv.querySelector('p')) {
+                historyDiv.innerHTML = '';
+            }
+            
+            const playerClass = player === 'landlord' ? 'player-landlord' : 
+                               player === 'landlord_up' ? 'player-up' : 'player-down';
+            const playerName = player === 'landlord' ? '地主' : 
+                              player === 'landlord_up' ? '地主上家' : '地主下家';
+            
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.innerHTML = `
+                <span><span class="player-tag ${playerClass}">${playerName}</span></span>
+                <span>${cards}</span>
+            `;
+            
+            historyDiv.insertBefore(item, historyDiv.firstChild);
+        }
+        
+        // 创建牌的HTML
+        function createCardHTML(card) {
+            const redCards = ['D', 'X'];
+            const isRed = redCards.includes(card);
+            const isJoker = card === 'D' || card === 'X';
+            const displayName = card === 'D' ? '大王' : card === 'X' ? '小王' : card;
+            
+            return `<div class="card-item ${isRed ? 'red' : 'black'} ${isJoker ? 'joker' : ''}">${displayName}</div>`;
+        }
+        
+        // 重置游戏
+        async function resetGame() {
+            if (!confirm('确定要重新开始吗？')) return;
+            
+            try {
+                const response = await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('my-position').textContent = '-';
+                    document.getElementById('my-role').textContent = '-';
+                    document.getElementById('landlord-position').textContent = '-';
+                    document.getElementById('current-turn').textContent = '-';
+                    document.getElementById('remaining-cards').textContent = '-';
+                    document.getElementById('hand-input').value = '';
+                    document.getElementById('hand-preview').innerHTML = '';
+                    document.getElementById('landlord-result').innerHTML = '';
+                    document.getElementById('bottom-cards-input').value = '';
+                    document.getElementById('bottom-cards-preview').innerHTML = '';
+                    document.getElementById('my-hand-display').innerHTML = '';
+                    document.getElementById('play-history').innerHTML = '<p style="color: #999; text-align: center;">暂无出牌记录</p>';
+                    document.getElementById('state-vector').textContent = '-';
+                    hideMCTSSuggestion();
+                    
+                    sessionId = 'session_' + Date.now();
+                    await initGame();
+                    
+                    goToStep(1);
+                    showMessage('游戏已重置', 'success');
+                }
+            } catch (error) {
+                showMessage('重置失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 页面加载时初始化
+        window.onload = async function() {
+            await initGame();
+            
+            // 确保步骤1显示
+            document.querySelectorAll('.step-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.getElementById('step-1').classList.add('active');
+            
+            console.log('页面加载完成，步骤1应该显示');
+            console.log('步骤1元素:', document.getElementById('step-1'));
+            console.log('步骤1是否可见:', document.getElementById('step-1').style.display);
+        };
+    </script>
+</body>
+</html>
